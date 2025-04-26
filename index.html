@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pyG - GTK Widget Framework</title>
+  <style>
+    :root {
+      /* Dark Theme (Default) */
+      --bg-dark: #0a0a0a;
+      --bg-darker: #050505;
+      --neon-red: #ff003c;
+      --neon-glow: 0 0 10px rgba(255, 0, 60, 0.8);
+      --text-light: #f0f0f0;
+      --text-muted: #888;
+      --transition-speed: 0.5s;
+      --sidebar-width: 200px;
+      --sidebar-collapsed: 60px;
+    }
+
+    /* Light Theme (Toggleable) */
+    [data-theme="light"] {
+      --bg-dark: #f5f5f5;
+      --bg-darker: #e0e0e0;
+      --neon-red: #d40032;
+      --neon-glow: 0 0 5px rgba(212, 0, 50, 0.6);
+      --text-light: #222;
+      --text-muted: #555;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-light);
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 900;
+      font-size: 25       
+      margin: 0;
+      display: flex;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Glass Effect */
+    .glass {
+      background: rgba(10,10,10,0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,0,60,0.2);
+      box-shadow: var(--neon-glow);
+      border-radius: 8px;
+      transition: all var(--transition-speed);
+    }
+    [data-theme="light"] .glass {
+      background: rgba(245,245,245,0.8);
+      border-color: rgba(212,0,50,0.2);
+    }
+
+    /* Sidebar */
+    nav {
+      width: var(--sidebar-width);
+      display: flex;
+      flex-direction: column;
+      padding: 1rem;
+      position: fixed;
+      top: 0; bottom: 0; left: 0;
+      transition: width var(--transition-speed);
+      overflow-x: hidden;
+      overflow-y: auto;
+      z-index: 100;
+    }
+    nav.collapsed { width: var(--sidebar-collapsed); }
+
+    /* Hamburger Icon */
+    .hamburger {
+      width: 30px; height: 24px; position: relative;
+      cursor: pointer; margin-bottom: 2rem;
+    }
+    .hamburger span {
+      position: absolute; height: 3px; width: 100%;
+      background: var(--text-light); left: 0;
+      transition: transform var(--transition-speed), top var(--transition-speed), opacity var(--transition-speed);
+    }
+    .hamburger span:nth-child(1) { top: 0; }
+    .hamburger span:nth-child(2) { top: 50%; transform: translateY(-50%); }
+    .hamburger span:nth-child(3) { bottom: 0; }
+    nav.collapsed .hamburger span:nth-child(1) { top:50%; transform: translateY(-50%) rotate(45deg); }
+    nav.collapsed .hamburger span:nth-child(2) { opacity: 0; }
+    nav.collapsed .hamburger span:nth-child(3) { top:50%; transform: translateY(-50%) rotate(-45deg); bottom:auto; }
+
+    /* Navigation Links */
+    .nav-link {
+      text-transform: uppercase; letter-spacing: 2px;
+      font-size: 0.9rem; padding: 0.75rem 1rem;
+      border-radius: 4px; transition: all var(--transition-speed);
+      color: var(--text-muted); white-space: nowrap;
+      overflow: hidden; margin-bottom: 0.5rem;
+      text-decoration: none;
+    }
+    nav.collapsed .nav-link { text-align: center; padding: 0.75rem 0; }
+    .nav-link:hover, .nav-link.active {
+      color: var(--neon-red); text-shadow: var(--neon-glow);
+      background: rgba(255,0,60,0.1);
+    }
+
+    /* Search Box */
+    .search-box {
+      margin-bottom: 1.5rem;
+      position: relative;
+    }
+    .search-box input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,0,60,0.3);
+      border-radius: 40px;
+      color: var(--text-light);
+      font-family: inherit;
+    }
+    .search-box input:focus {
+      outline: none;
+      border-color: var(--neon-red);
+      box-shadow: var(--neon-glow);
+    }
+    [data-theme="light"] .search-box input {
+      background: rgba(255,255,255,0.7);
+    }
+
+.theme-capsule {
+  display: inline-flex;
+  background: rgba(255, 0, 60, 0.1);
+  border-radius: 50px;
+  padding: 2px;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(255, 0, 60, 0.3);
+  position: relative;
+}
+
+.theme-option {
+  padding: 0.5rem 1.2rem;
+  cursor: pointer;
+  z-index: 2;
+  color: var(--text-muted);
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.theme-slider {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  background: rgba(255, 0, 60, 0.3);
+  border-radius: 50px;
+  z-index: 1;
+  transition: all 0.4s ease;
+  width: 0; /* Dynamically set by JS */
+}
+    .theme-toggle:hover {
+      color: var(--neon-red);
+      transform: rotate(30deg);
+    }
+
+    /* Main Content */
+    .content {
+      margin-left: var(--sidebar-width);
+      padding: 2rem;
+      flex: 1;
+      transition: margin-left var(--transition-speed);
+    }
+    nav.collapsed + .content { margin-left: var(--sidebar-collapsed); }
+
+    /* Pages */
+    .page {
+      min-height: 100vh;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    .page.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Headings */
+h1 {
+  font-size: 2.8rem; /* Original: 2.5rem */
+  letter-spacing: -0.05em;
+  margin-bottom: 1.5rem;
+}
+
+h2 {
+  font-size: 2rem; /* Original: 1.8rem */
+  letter-spacing: -0.03em;
+  margin: 2.5rem 0 1.5rem;
+}
+
+h3 {
+  font-size: 1.5rem; /* Original: implicit (likely 1.2rem) */
+  text-shadow: var(--neon-glow);
+  margin: 2rem 0 1rem;
+}
+
+    /* Text Elements */
+p, ul {
+  font-size: 3rem;
+  line-height: 1.8;
+  margin: 1.5rem 0;
+  max-width: 75ch; /* Optimal line length */
+}
+    ul li { margin:0.5rem 0; }
+
+    /* Code Blocks */
+    .code-block {
+      background:rgba(0,0,0,0.5);
+      border-left:3px solid var(--neon-red);
+      padding:1.5rem;
+      margin:1.5rem 0;
+      overflow-x:auto;
+      border-radius:1rem;
+      transition: box-shadow var(--transition-speed);
+      position: relative;
+      white-space: pre; 
+      font-size: 35;
+    }
+    .code-block:hover { box-shadow:0 0 15px rgba(255,0,60,0.9); }
+    [data-theme="light"] .code-block { background:rgba(0,0,0,0.1); }
+
+    /* Code Text */
+    code { font-family:'Courier New', monospace; color: var(--neon-red); }
+
+    /* Copy Button */
+    .copy-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      background: rgba(255,0,60,0.2);
+      border: none;
+      width: 28px;
+      height: 28px;
+      border-radius: 40px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover {
+      background: rgba(255,0,60,0.4);
+    }
+    .copy-btn svg {
+      width: 16px;
+      height: 16px;
+      fill: var(--text-light);
+    }
+    .copy-btn.copied {
+      background: rgba(0,255,0,0.2);
+    }
+    .copy-btn.copied svg {
+      fill: #00ff00;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      nav, nav.collapsed {
+        position: fixed;
+        width: 100%;
+        height: auto;
+        flex-direction: row;
+        overflow-x: auto;
+        padding: 0.5rem 1rem;
+      }
+      .hamburger { margin-bottom:0; }
+      .nav-link { flex: 1 0 auto; text-align: center; margin-bottom: 0; }
+      .content { margin-left: 0; padding: 1rem; margin-top: 60px; }
+      .search-box, .theme-toggle { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Sidebar Navigation -->
+  <nav class="glass" id="sidebar">
+    <div class="hamburger" id="toggleBtn"><span></span><span></span><span></span></div>
+    
+    <!-- Search Box -->
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Search documentation...">
+    </div>
+    
+    <!-- Theme Toggle -->
+  <div class="theme-capsule">
+  <div class="theme-slider"></div>
+  <div class="theme-option active" data-theme="dark">@</div>
+  <div class="theme-option" data-theme="light">0</div>
+</div>
+    
+    <!-- Navigation Links -->
+    <a href="#home" class="nav-link active" data-page="home">Home</a>
+    <a href="#button" class="nav-link" data-page="button">Button</a>
+    <a href="#label" class="nav-link" data-page="label">Label</a>
+    <a href="#window" class="nav-link" data-page="window">Window</a>
+    <a href="#widgetbox" class="nav-link" data-page="widgetbox">WidgetBox</a>
+  </nav>
+  
+  <!-- Main Content -->
+  <div class="content">
+    <!-- Home Page -->
+    <div id="home" class="page">
+      <h1>pyG</h1>
+      <p>Python-scriptable desktop widget framework.</p>
+      <div class="code-block glass">
+        <code>~/.config/pyg/config.py | style.scss</code>
+        <button class="copy-btn" title="Copy to clipboard">
+          <svg viewBox="0 0 24 24">
+            <path class="copy-icon" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+            <path class="check-icon" d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" style="display:none;"/>
+          </svg>
+        </button>
+      </div>
+      <h2>Features</h2>
+      <ul>
+        <li>Scriptable widgets (Bash, Python, Rust)</li>
+        <li>Dynamic content updates</li>
+        <li>Customizable layouts</li>
+      </ul>
+      <h3>Why I Created pyG</h3>
+      <p>it might seem like the syntax is hard as hell and writing widgets in this way is just suffering 
+        but you wouldn't use It if for you syntax is tricky 
+
+        but the widget system im created for my own use because other widgets systems im just don't understand and basically syntax here making comfortable for myself 
+        so I'm created my own using knowledge in pygobject<code>PyGObject</code>.</p>
+    </div>
+    
+    <!-- Button Widget Page -->
+    <div id="button" class="page">
+      <h1>Button Widget</h1>
+      <p>Interactive elements that execute scripts on click.</p>
+      <div class="code-block glass">
+        <code>widget.button.[button_name] [ 
+        child="dynamic-label/label_name" 
+        onclick-event="command_or_script_path" 
+        orientation="v|h" 
+        ]</code>
+        <button class="copy-btn" title="Copy to clipboard">
+          <svg viewBox="0 0 24 24">
+            <path class="copy-icon" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+            <path class="check-icon" d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" style="display:none;"/>
+          </svg>
+        </button>
+      </div>
+      <div class="property">
+        <span class="property-name">onclick-event</span>
+        <span>Path to script (Bash/Python/Rust) or direct command</span>
+      </div>
+      <div class="example">
+        <div class="example-title">Example:</div>
+        <div class="code-block glass">
+          <code>widget.button.wifi_toggle [ 
+          child="dynamic-label.wifi_status" 
+          onclick-event="~/scripts/toggle_wifi.sh" 
+          orientation="h" 
+          ]</code>
+          <button class="copy-btn" title="Copy to clipboard">
+            <svg viewBox="0 0 24 24">
+              <path class="copy-icon" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+              <path class="check-icon" d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" style="display:none;"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Label Widgets Page -->
+    <div id="label" class="page">
+      <h1>Label Widgets</h1>
+      <h2>Static Label</h2>
+      <div class="code-block glass">
+      	label or static label mean that simply static and never changeable 
+        <code>widget.label.[label_name] [ 
+        text="Your text here" 
+        orientation="v|h" 
+        ]</code>
+        <button class="copy-btn" title="Copy to clipboard">
+          <svg viewBox="0 0 24 24">
+            <path class="copy-icon" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+            <path class="check-icon" d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" style="display:none;"/>
+          </svg>
+        </button>
+      </div>
+      <h2>Dynamic Label</h2>
+      <div class="code-block glass">
+      	dynamic label fetch output if for example enter simple command "date" the label will be output of the command or if you have more complex stuff like scripts feel free they work with dynamic labels 
+        <code>widget.dynamic-label.[label_name] [ 
+        script-path="path_to_script/command" 
+        update-timing="seconds" #time per seconds for update
+        ]</code>
+        <button class="copy-btn" title="Copy to clipboard">
+          <svg viewBox="0 0 24 24">
+            <path class="copy-icon" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+            <path class="check-icon" d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" style="display:none;"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Window Widget Page -->
+    <div id="window" class="page">
+      <h1>Window Widget</h1>
+      <p>Container with flexible positioning.</p>
+      <div class="code-block glass">
+        <code>widget.window.[window_name] [ anchor=["top","left","right","bottom"] child="widget_names" exclusivity="exclusive" ]</code>
+        <button class="copy-btn" title="Copy to clipboard">
+          <svg viewBox="0 0 24 24">
+            <path class="copy-icon" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+            <path class="check-icon" d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" style="display:none;"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    
+    <!-- WidgetBox Page -->
+    <div id="widgetbox" class="page">
+      <h1>WidgetBox</h1>
+      <p>Container for organizing multiple widgets.</p>
+      <div class="code-block glass">
+        <code>widget.widgetBox.[box_name] [ 
+        child="widget_names" 
+        orientation="v|h" 
+        ]</code>
+        <button class="copy-btn" title="Copy to clipboard">
+          <svg viewBox="0 0 24 24">
+            <path class="copy-icon" d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2m-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z"/>
+            <path class="check-icon" d="M21 7L9 19l-5.5-5.5 1.41-1.41L9 16.17 19.59 5.59 21 7z" style="display:none;"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Sidebar Toggle
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('toggleBtn').addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed');
+    });
+
+    // Theme Toggle
+const themeOptions = document.querySelectorAll('.theme-option');
+const slider = document.querySelector('.theme-slider');
+
+function updateSlider() {
+  const activeOption = document.querySelector('.theme-option.active');
+  slider.style.width = `${activeOption.offsetWidth}px`;
+  slider.style.left = `${activeOption.offsetLeft}px`;
+}
+
+themeOptions.forEach(option => {
+  option.addEventListener('click', () => {
+    themeOptions.forEach(opt => opt.classList.remove('active'));
+    option.classList.add('active');
+    document.body.setAttribute('data-theme', option.dataset.theme);
+    updateSlider();
+  });
+});
+
+// Initialize
+updateSlider();
+window.addEventListener('resize', updateSlider);
+    // Copy Functionality with SVG Icons
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const codeBlock = btn.parentElement.querySelector('code');
+        try {
+          await navigator.clipboard.writeText(codeBlock.textContent);
+          
+          // Visual feedback
+          btn.classList.add('copied');
+          const copyIcon = btn.querySelector('.copy-icon');
+          const checkIcon = btn.querySelector('.check-icon');
+          
+          copyIcon.style.display = 'none';
+          checkIcon.style.display = 'block';
+          
+          setTimeout(() => {
+            btn.classList.remove('copied');
+            copyIcon.style.display = 'block';
+            checkIcon.style.display = 'none';
+          }, 2000);
+          
+        } catch (err) {
+          console.error('Failed to copy: ', err);
+        }
+      });
+    });
+
+    // Smooth Scroll + Active Page Highlight
+    const sections = document.querySelectorAll('.page');
+    const navLinks = document.querySelectorAll('.nav-link');
+    
+    navLinks.forEach(link => {
+      link.addEventListener('click', e => {
+        e.preventDefault();
+        navLinks.forEach(nav => nav.classList.remove('active'));
+        link.classList.add('active');
+        const target = document.getElementById(link.dataset.page);
+        target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    // Highlight Active Section on Scroll
+    window.addEventListener('scroll', () => {
+      let current = '';
+      sections.forEach(sec => {
+        const rect = sec.getBoundingClientRect();
+        if (rect.top <= 100 && rect.bottom >= 100) current = sec.id;
+      });
+      navLinks.forEach(link => link.classList.toggle('active', link.dataset.page === current));
+    });
+
+    // Search Functionality
+    const searchInput = document.getElementById('searchInput');
+    searchInput.addEventListener('input', () => {
+      const searchTerm = searchInput.value.toLowerCase();
+      if (searchTerm.length > 2) {
+        // Implement search logic here (could filter pages or scroll to matches)
+        console.log(`Searching for: ${searchTerm}`);
+      }
+    });
+
+    // Reveal Effect on Scroll
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) entry.target.classList.add('visible');
+      });
+    }, { threshold: 0.1 });
+    sections.forEach(sec => observer.observe(sec));
+  </script>
+</body>
+</html>
